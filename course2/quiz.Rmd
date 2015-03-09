@@ -1,0 +1,356 @@
+---
+title: "Homework"
+author: "Yu Zhou"
+date: "March 5, 2015"
+output: html_document
+---
+
+### Week 1 intro.
+```{r}
+library(UsingR)
+data(father.son)
+summary(father.son)
+```
+
+```{r}
+mean(father.son[round(father.son$fheight) == 71, "sheight"])
+```
+
+```{r}
+X <- matrix(1:1000,100,10)
+X[25, 3]
+```
+
+```{r}
+x <- 1:10
+X <- cbind(x, 2*x, 3*x, 4*x, 5*x)
+sum(X[7, ])
+```
+
+```{r}
+matrix(1:60, 20, 3, byrow=TRUE)
+```
+
+```{r}
+#3a + 4b - 5c + d = 10
+#2a + 2b + 2c - d = 5
+#a -b + 5c - 5d = 7
+#5a + d = 4
+X <- matrix(c(3, 4, -5, 1, 2, 2, 2, -1, 1, -1, 5, -5, 5, 0, 0, 1), 4, byrow = TRUE)
+X
+y <- c(10, 5, 7, 4)
+solve(X, y)
+b <- solve(X) %*% y
+print(b)
+```
+
+```{r}
+a <- matrix(1:12, nrow=4)
+b <- matrix(1:15, nrow=3)
+res <- a %*% b
+res[3, 2]
+sum(a[3, ] * b[, 2])
+```
+
+### Week 1 Matrix Algebra
+
+```{r}
+X <- matrix(c(1,1,1,1,0,0,1,1),nrow=4)
+rownames(X) <- c("a","a","b","b")
+beta <- c(5, 2)
+X
+beta
+X %*% beta
+```
+
+```{r}
+X <- matrix(c(1,1,1,1,1,1,0,0,1,1,0,0,0,0,0,0,1,1),nrow=6)
+rownames(X) <- c("a","a","b","b","c","c")
+X
+beta <- c(10,3,-3)
+X %*% beta
+```
+
+### Week 2
+
+```{r}
+g <- 9.8 ## meters per second
+h0 <- 56.67
+v0 <- 0
+n <- 25
+tt <- seq(0,3.4,len=n) ##time in secs, t is a base function
+
+solve_g <- function() {
+  y <- h0 + v0 *tt - 0.5* g*tt^2 + rnorm(n, sd=1)
+  X <- cbind(1,tt,tt^2)
+  A <- solve(crossprod(X)) %*% t(X)
+  ghat <- -2*(A %*% y)[3]
+  ghat
+}
+solve_g()
+```
+
+```{r}
+betahat <- replicate(100000, solve_g())
+sqrt(mean( (betahat-mean(betahat) )^2))
+sd(betahat)
+```
+
+```{r}
+library(UsingR)
+x <- father.son$fheight
+y <- father.son$sheight
+n <- length(y)
+n
+
+betahat <- replicate(10000, {
+  N <- 50
+  index <- sample(n,N)
+  sampledat <- father.son[index,]
+  x <- sampledat$fheight
+  y <- sampledat$sheight
+  betahat = lm(y~x)$coef
+  betahat[2]
+  })
+betahat
+sqrt(mean( (betahat-mean(betahat) )^2))
+```
+
+```{r}
+mean((y-mean(y)) * (x-mean(x)))
+```
+
+### QUESTION 2.2.1
+```{r}
+library(UsingR)
+x <- father.son$fheight
+y <- father.son$sheight
+
+n <- length(y)
+N <- 50
+set.seed(1)
+index <- sample(n, N)
+sampledat <- father.son[index, ]
+x <- sampledat$fheight
+y <- sampledat$sheight
+fit <- lm(y ~ x)
+summary(fit)
+SSR <- sum((y - fit$fitted.values)^2)
+SSR
+sigma2 <- SSR / 48
+sigma2
+```
+
+```{r}
+X <- cbind(rep(1, N), x)
+#(X^T X)^-1
+S <- solve(t(X) %*% X)
+S[1, 1]
+```
+
+```{r}
+sqrt(sigma2 * diag(S))
+```
+
+
+```{r}
+group <- factor(c(1,1,1,1,2,2,2,2))
+condition <- factor(c("a","a","b","b","a","a","b","b"))
+model.matrix(~ group + condition)
+group <- factor(c(1,2))
+model.matrix(~ group)
+group <- factor(c(1,1,2,2))
+model.matrix(~ group)
+condition <- factor(c("a","b"))
+model.matrix(~ condition)
+model.matrix(~ group + condition)
+```
+
+### QUESTION 2.4.1
+```{r}
+nx <- 5
+ny <- 7
+X <- cbind(rep(1,nx + ny), rep(c(0,1),c(nx, ny)))
+X
+t(X) %*% X
+```
+
+### QUESTION 2.5.1  
+```{r}
+species <- factor(c("A","A","B","B"))
+condition <- factor(c("control","treated","control","treated"))
+model.matrix(~ species + condition)
+library(contrast)
+
+y <- rnorm(4) # good trick
+fit <- lm(y ~ species + condition)
+contrast(fit, list(species="B",condition="control"), list(species="A",condition="treated"))$X
+contrast(fit, list(species="B",condition="control"), list(species="A",condition="control"))$X
+```
+
+```{r}
+url <- "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/spider_wolff_gorb_2013.csv"
+filename <- "spider_wolff_gorb_2013.csv"
+library(downloader)
+#if (!file.exists(filename)) download(url, filename)
+spider <- read.csv(filename, skip=1)
+head(spider)
+fitTL <- lm(friction ~ type + leg, data=spider)
+summary(fitTL)
+L4vsL2 <- contrast(fitTL,list(leg="L4",type="pull"),list(leg="L2",type="pull"))
+L4vsL2
+```
+
+```{r}
+X <- model.matrix(~ type + leg, data=spider)
+(Sigma <- sum(fitTL$residuals^2)/(nrow(X) - ncol(X)) * solve(t(X) %*% X))
+C <- matrix(c(0,0,-1,0,1),1,5)
+Sigma["legL4", "legL2"]
+Sigma
+```
+
+```{r}
+beta <- coef(fitTL)
+beta
+
+sqrt(C %*% Sigma %*% t(C)) == sqrt(Sigma["legL4", "legL4"] + Sigma["legL2", "legL2"] - 2*Sigma["legL4", "legL2"])
+```
+
+
+### QUESTION 2.6.1
+```{r}
+spider$log2friction <- log2(spider$friction)
+head(spider)
+str(spider)
+boxplot(log2friction ~ type*leg, data=spider)
+fitX <- lm(log2friction ~ type + leg + type:leg, data=spider)
+summary(fitX)
+coefs <- coef(fitX)
+coefs
+```
+
+```{r}
+library(RColorBrewer)
+spider$group <- factor(paste0(spider$leg, spider$type))
+stripchart(split(spider$log2friction, spider$group), 
+           vertical=TRUE, pch=1, method="jitter", las=2, xlim=c(0,10), ylim=c(-2,1))
+cols <- brewer.pal(8,"Dark2")
+a <- -0.25
+lgth <- .1
+abline(h=0)
+arrows(1+a,0,1+a,coefs[1],lwd=3,col=cols[1],length=lgth)
+abline(h=coefs[1],col=cols[1])
+arrows(2+a,coefs[1],2+a,coefs[1]+coefs[2],lwd=3,col=cols[2],length=lgth)
+arrows(3+a,coefs[1],3+a,coefs[1]+coefs[3],lwd=3,col=cols[3],length=lgth)
+arrows(5+a,coefs[1],5+a,coefs[1]+coefs[4],lwd=3,col=cols[4],length=lgth)
+arrows(7+a,coefs[1],7+a,coefs[1]+coefs[5],lwd=3,col=cols[5],length=lgth)
+# now the interactions:
+segments(3+a,coefs[1]+coefs[3],4+a,coefs[1]+coefs[3],lwd=3,col=cols[3])
+arrows(4+a,coefs[1]+coefs[3],4+a,coefs[1]+coefs[3]+coefs[2],lwd=3,col=cols[2],length=lgth)
+arrows(4+a,coefs[1]+coefs[2]+coefs[3],4+a,coefs[1]+coefs[2]+coefs[3]+coefs[6],lwd=3,col=cols[6],length=lgth)
+#
+segments(5+a,coefs[1]+coefs[4],6+a,coefs[1]+coefs[4],lwd=3,col=cols[4])
+arrows(6+a,coefs[1]+coefs[4],6+a,coefs[1]+coefs[4]+coefs[2],lwd=3,col=cols[2],length=lgth)
+arrows(6+a,coefs[1]+coefs[4]+coefs[2],6+a,coefs[1]+coefs[4]+coefs[2]+coefs[7],lwd=3,col=cols[7],length=lgth)
+#
+segments(7+a,coefs[1]+coefs[5],8+a,coefs[1]+coefs[5],lwd=3,col=cols[5])
+arrows(8+a,coefs[1]+coefs[5],8+a,coefs[1]+coefs[5]+coefs[2],lwd=3,col=cols[2],length=lgth)
+arrows(8+a,coefs[1]+coefs[5]+coefs[2],8+a,coefs[1]+coefs[5]+coefs[2]+coefs[8],lwd=3,col=cols[8],length=lgth)
+#legend("right",names(coefs),fill=cols,cex=.75,bg="white")
+```
+
+```{r}
+anova(fitX)
+
+coef(fitX)["legL2"]
+
+contrast(fitX, list(type="push",leg="L2"), list(type="push",leg="L1"))
+coef(fitX)["legL2"] + coef(fitX)["typepush:legL2"]
+```
+
+
+```{r}
+N <- 40
+p <- 4
+group <- factor(rep(1:p,each=N/p))
+X <- model.matrix(~ group)
+X
+
+
+Fs <- replicate(1000, {
+  Y <- rnorm(N,mean=42,7)
+  Y
+  
+  mu0 <- mean(Y)
+  initial.ss <- sum((Y - mu0)^2)
+  
+  s <- split(Y, group)
+  after.group.ss <- sum(sapply(s, function(x) sum((x - mean(x))^2)))
+  
+  (group.ss <- initial.ss - after.group.ss)
+  
+  group.ms <- group.ss / (p - 1)
+  after.group.ms <- after.group.ss / (N - p)
+  
+  f.value <- group.ms / after.group.ms
+  f.value
+  })
+  
+mean(Fs)
+hist(Fs, col="grey", border="white", breaks=50, freq=FALSE)
+xs <- seq(from=0,to=6,length=100)
+lines(xs, df(xs, df1 = p - 1, df2 = N - p), col="red")
+
+```
+
+### QUESTION 2.7.2  
+```{r}
+sex <- factor(rep(c("female","male"),each=4))
+trt <- factor(c("A","A","B","B","C","C","D","D"))
+X <- model.matrix( ~ sex + trt)
+X
+qr(X)$rank
+
+Y <- 1:8
+makeYstar <- function(a,b) Y - X[,2] * a - X[,5] * b
+fitTheRest <- function(a,b) {
+  Ystar <- makeYstar(a,b)
+  Xrest <- X[,-c(2,5)]
+  betarest <- solve(t(Xrest) %*% Xrest) %*% t(Xrest) %*% Ystar
+  residuals <- Ystar - Xrest %*% betarest
+  sum(residuals^2)
+}
+fitTheRest(1, 2)
+```
+
+```{r}
+outer(1:3,1:3,`*`)
+
+min(outer(-2:8,-2:8,Vectorize(fitTheRest)))
+```
+
+
+```{r}
+library(rafalib)
+imagemat(outer(-2:8,-2:8,Vectorize(fitTheRest)))
+```
+
+
+```{r}
+Y <- matrix(spider$friction, ncol=1)
+X <- model.matrix(~ type + leg, data=spider)
+
+QR <- qr(X)
+Q <- qr.Q(QR)
+R <- qr.R(QR)
+Q[1, 1]
+R[1, 1]
+crossprod(Q, Y)[1, 1]
+(betahat <- backsolve(R, crossprod(Q, Y) ) )
+
+fit <- lm(friction ~ type + leg, data=spider)
+coef(fit)
+t(betahat)
+
+```
+
