@@ -1,0 +1,410 @@
+---
+title: "hw5"
+author: "Yu Zhou"
+date: "March 22, 2015"
+output: html_document
+---
+
+
+### QUESTION 3.1.1  
+
+```{r}
+library(dagdata)
+data(admissions)
+print( admissions )
+
+index = which(admissions$Gender==1)
+accepted= sum(admissions$Number[index] * admissions$Percent[index]/100)
+applied = sum(admissions$Number[index])
+accepted/applied
+
+
+index = which(admissions$Gender==0)
+accepted= sum(admissions$Number[index] * admissions$Percent[index]/100)
+applied = sum(admissions$Number[index])
+accepted/applied
+```
+
+```{r}
+library(dplyr)
+dfa <- admissions %>% group_by(Gender) %>% summarise(
+  accepted=sum(Number*Percent/100),
+  rejected=sum(Number*(1-Percent/100)))
+dfa
+dfa <- arrange(dfa, -Gender)
+M <- as.matrix(dfa[, 2:3])
+rownames(M) <- dfa$Gender
+M
+(Xsq <- chisq.test(M)) 
+Xsq$p.value
+
+index = admissions$Gender==1
+men = admissions[index,]
+women = admissions[!index,]
+menYes = sum(men$Number*men$Percent/100)
+menNo = sum(men$Number*(1-men$Percent/100))
+womenYes = sum(women$Number*women$Percent/100)
+womenNo = sum(women$Number*(1-women$Percent/100))
+tab = matrix(c(menYes,womenYes,menNo,womenNo),2,2)
+tab
+chisq.test(tab)$p.value
+
+admissions
+index = admissions$Gender==1
+men = admissions[index,]
+women = admissions[!index,]
+print( data.frame( major=admissions[1:6,1],men=men[,3], women=women[,3]) )
+```
+
+```{r}
+head(admissions)
+dfrate <- admissions %>% group_by(Major) %>% summarise(rate=sum(Number*Percent/100)/sum(Number)) 
+dfrate[which.min(dfrate$rate), ]
+```
+
+```{r}
+dfrate
+admissions
+cor(admissions[1:6, "Number"], dfrate$rate)
+cor(admissions[7:12, "Number"], dfrate$rate)
+```
+
+
+### QUESTION 3.2.1
+
+```{r}
+#library(devtools)
+#install_github("genomicsclass/GSE5859")
+library(Biobase)
+library(GSE5859)
+data(GSE5859)
+geneExpression = exprs(e)
+sampleInfo = pData(e)
+
+tbl_df(sampleInfo)
+nrow(sampleInfo)
+year = format(sampleInfo$date,"%y")
+head(year)
+length( unique(year) )
+table(sampleInfo$ethnicity, year)
+```
+
+```{r}
+month.year = format(sampleInfo$date,"%m%y")
+tab <- table(sampleInfo$ethnicity, month.year)
+sum(colSums(tab != 0) >= 2) / ncol(tab)
+
+```
+
+```{r}
+library(genefilter)
+library(qvalue)
+all(colnames(geneExpression) == sampleInfo$filename)
+head(geneExpression[, 1:5])
+head(sampleInfo)
+idx1 <- which(sampleInfo$ethnicity == "CEU" & year == "02")
+idx2 <- which(sampleInfo$ethnicity == "CEU" & year == "03")
+tt <- rowttests(geneExpression[, c(idx1, idx2)],
+          factor(c(rep("02", length(idx1)), rep("03", length(idx2)))))
+qv <- qvalue(tt$p.value)
+str(qv)
+sum(qv$qvalues < 0.05)
+qv$pi0
+```
+
+
+```{r}
+index = which(year%in% c("03","04") & sampleInfo$ethnicity=="CEU")
+pval = rowttests(geneExpression[ ,index], factor(year[index]))$p.value
+qval = qvalue(pval)
+sum(qval$qvalue < 0.05)
+
+```
+
+```{r}
+index <- which(sampleInfo$ethnicity %in% c("ASN", "CEU"))
+pval <- rowttests(geneExpression[, index], factor(sampleInfo$ethnicity[index]))$p.value
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.05)
+```
+
+
+```{r}
+index <- which(sampleInfo$ethnicity %in% c("ASN", "CEU") & year == "05")
+pval <- rowttests(geneExpression[, index], factor(sampleInfo$ethnicity[index]))$p.value
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.05)
+table(sampleInfo$ethnicity[index])
+```
+
+```{r}
+set.seed(3)
+index <- c(
+  which(sampleInfo$ethnicity == "ASN" & year == "05"),
+  sample(which(sampleInfo$ethnicity == "CEU" & year == "02"), 3))
+index
+pval <- rowttests(geneExpression[, index], factor(sampleInfo$ethnicity[index]))$p.value
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.05)
+
+
+year = factor( format(sampleInfo$date,"%y") )
+index1 = which(sampleInfo$ethnicity=="ASN" & year=="05")
+set.seed(3)
+index2 = sample( which(sampleInfo$ethnicity == "CEU" & year=="02"), 3)
+index = c( index1, index2)
+g = droplevels(sampleInfo$ethnicity[index])
+g
+pval = rowttests(geneExpression[ ,index], g)$p.value
+qval = qvalue(pval)
+sum(qval$qvalue < 0.05)
+```
+
+
+### QUESTION 3.3.1  
+
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+tbl_df(sampleInfo)
+sex = sampleInfo$group
+month = factor( format(sampleInfo$date,"%m"))
+table( sampleInfo$group, month)
+str(sampleInfo)
+pval <- rowttests(geneExpression, factor(sampleInfo$group))$p.value
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.1)
+
+```
+
+```{r}
+head(geneExpression)
+nrow(geneAnnotation)
+all(geneAnnotation$PROBEID == rownames(geneExpression))
+chroms <- geneAnnotation[qval$qvalue < 0.1, "CHR"]
+mean(chroms %in% c("chrX", "chrY"))
+
+gidx <- which(qval$qvalue < 0.1 & !(geneAnnotation$CHR %in% c("chrX", "chrY")))
+pval <- rowttests(geneExpression[index, ], month)$p.value
+mean(pval < 0.05)
+```
+
+```{r}
+X = model.matrix(~sex+month)
+X
+
+pval <- sapply(1:nrow(geneExpression), function(i) {
+  y = geneExpression[i, ]
+  fit = lm(y ~ X-1)  ## why -1 ?? 
+  summary(fit)$coef[2, 4]
+})
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.1)
+
+chroms <- geneAnnotation[qval$qvalue < 0.1, "CHR"]
+mean(chroms %in% c("chrX", "chrY"))
+
+```
+
+```{r}
+pval <- sapply(1:nrow(geneExpression), function(i) {
+  y = geneExpression[i, ]
+  fit = lm(y ~ X-1)  ## why -1 ?? 
+  summary(fit)$coef[3, 4]
+})
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.1)
+```
+
+### QUESTION 3.4.1
+```{r}
+library(Biobase)
+library(GSE5859Subset)
+data(GSE5859Subset)
+y = geneExpression - rowMeans(geneExpression)
+```
+
+```{r}
+library(rafalib)
+library(dplyr)
+
+mypar2(1, 2)
+dim(y)
+m <- cor(y)
+dim(m)
+image(t(m))
+
+sampleInfo
+sampleInfo2 <- dplyr::arrange(sampleInfo, date)
+head(sampleInfo2)
+m2 <- cor(y[, sampleInfo2$filename])
+image(t(m2))
+mypar2(1, 1)
+```
+
+```{r}
+##advanced version
+library(rafalib)
+sex = sampleInfo$group
+mypar2(1,2)
+cols=colorRampPalette(rev(brewer.pal(11,"RdBu")))(100)
+cors = cor(y)
+image(1:ncol(y),1:ncol(y),cors,col=cols,zlim=c(-1,1),
+       xaxt="n",xlab="",yaxt="n",ylab="")
+axis(2,1:ncol(y),sex,las=2)
+axis(1,1:ncol(y),sex,las=2)
+o = order(sampleInfo$date)
+image(1:ncol(y),1:ncol(y),cors[o,o],col=cols,zlim=c(-1,1),
+      xaxt="n",xlab="",yaxt="n",ylab="")
+label = gsub("2005-","",sampleInfo$date[o])
+axis(2,1:ncol(y),label,las=2)
+axis(1,1:ncol(y),label,las=2)
+```
+
+```{r}
+pcs <- svd(y)$v
+dim(pcs)
+```
+
+```{r}
+month <- factor( format(sampleInfo$date,"%m"))
+label = gsub("2005-", "", sampleInfo$date)
+mypar2(1, 1)
+plot(sampleInfo$date, pcs[, 1], col=as.numeric(month))
+text(sampleInfo$date, pcs[, 1], label=label)
+mypar2(4, 6)
+for (i in 1:ncol(pcs)) {
+  plot(sampleInfo$date, pcs[, i], xaxt="s", col=as.numeric(month))
+}
+```
+
+```{r}
+pcs = svd(y)$v[,1:2]
+o = order(sampleInfo$date)
+cols = as.numeric(month)[o]
+mypar2(2,1)
+for(i in 1:2){
+  plot(pcs[o,i],col=cols,xaxt="n",xlab="")
+  label = gsub("2005-","",sampleInfo$date[o])
+  axis(1,1:ncol(y),label,las=2)
+}
+```
+
+```{r}
+x <- matrix(c(4, 8, 3, 6), 2)
+x
+svd(x)
+```
+
+```{r}
+s <- svd(y)
+vep <- s$d ^2/sum(s$d^2)
+sum(vep >= 0.10)
+```
+
+
+```{r}
+dim(s$v)
+cormonth <- apply(s$v, 2, function(x) abs(cor(x, as.numeric(month))))
+max(cormonth)
+which.max(cormonth)
+
+corsex <- apply(s$v, 2, function(x) abs(cor(x, as.numeric(sex))))
+max(corsex)
+which.max(corsex)
+```
+
+
+```{r}
+X <- model.matrix(~sex+s$v[,1:2])
+
+pval <- sapply(1:nrow(geneExpression), function(i) {
+  y = geneExpression[i, ]
+  fit = lm(y ~ X-1)  ## why -1 ?? 
+  summary(fit)$coef[2, 4]
+})
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.1)
+
+chroms <- geneAnnotation[qval$qvalue < 0.1, "CHR"]
+mean(chroms %in% c("chrX", "chrY"))
+
+```
+
+### QUESTION 3.5.1
+
+```{r}
+library(sva)
+library(Biobase)
+library(GSE5859Subset)
+data(GSE5859Subset)
+
+```
+
+```{r}
+s <- svd(geneExpression-rowMeans(geneExpression))
+cor(sampleInfo$group,s$v[,1])
+
+sex = sampleInfo$group
+mod = model.matrix(~sex)
+mod
+mod0 <- model.matrix(~1, data=sampleInfo)
+mod0
+
+svafit = sva(geneExpression,mod)
+head(svafit$sv)
+for(i in 1:ncol(svafit$sv)){
+  print( cor(s$v[,i],svafit$sv[,i]) )
+}
+
+modSv = cbind(mod, svafit$sv)
+mod0Sv = cbind(mod0, svafit$sv)
+pval = f.pvalue(geneExpression, modSv, mod0Sv)
+pval
+qval <- qvalue(pval)
+sum(qval$qvalue < 0.1)
+
+chroms <- geneAnnotation[qval$qvalue < 0.1, "CHR"]
+mean(chroms %in% c("chrX", "chrY"))
+
+```
+
+#### answer
+```{r}
+library(qvalue)
+library(sva)
+X= model.matrix(~sex+svafit$sv)
+pvals = sapply(1:nrow(geneExpression),function(i){
+  y = geneExpression[i,]
+  fit = lm(y~X-1)
+  summary(fit)$coef[2,4]
+})
+qvals = qvalue(pvals)$qvalue
+sum(qvals<0.1)
+```
+
+
+```{r}
+res = sapply(1:nrow(geneExpression),function(i){
+  y = geneExpression[i,]
+	fit = lm(y~X-1)
+	summary(fit)$coef[2,c(1,4)]
+})
+
+qvals = qvalue(res[2,])$qvalue
+pcutoff = max( res[2,qvals < .1] )
+library(rafalib)
+mypar2(1,1)
+
+plot(res[1,],-log10(res[2,]),xlab="M",ylab="log10 p-value")
+
+ind = which(geneAnnotation$CHR=="chrY")
+points(res[1,ind],-log10(res[2,ind]),col=1,pch=16)
+
+ind = which(geneAnnotation$CHR=="chrX")
+points(res[1,ind],-log10(res[2,ind]),col=2,pch=16)
+
+abline(h=-log10(pcutoff))
+legend("bottomleft",c("chrX","chrY"),col=c(2,1),pch=16)
+```
+

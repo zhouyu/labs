@@ -1,0 +1,276 @@
+---
+title: "hw1"
+author: "Yu Zhou"
+date: "March 14, 2015"
+output: html_document
+---
+
+```{r}
+setwd("course3")
+```
+
+
+### Part 1
+```{r}
+#library(devtools)
+#install_github("genomicsclass/GSE5859Subset")
+library(GSE5859Subset)
+data(GSE5859Subset) ##this loads the three tables
+```
+
+```{r}
+head(sampleInfo)
+str(sampleInfo)
+sum(sampleInfo$date == as.Date("2005-06-27"))
+```
+
+```{r}
+head(geneAnnotation)
+table(geneAnnotation$CHR)
+str(geneAnnotation)
+sum(geneAnnotation$CHR=="chrY", na.rm=TRUE)
+```
+
+```{r}
+head(geneAnnotation)
+head(geneExpression)
+samples <- sampleInfo[sampleInfo$date == as.Date("2005-06-10"), "filename"]
+probes <- geneAnnotation[which(geneAnnotation$SYMBOL == "ARPC1A"), "PROBEID"]
+geneExpression[probes, samples]
+
+i = which(geneAnnotation$SYMBOL=="ARPC1A")
+j = which(sampleInfo$date=="2005-06-10")
+geneExpression[i,j]
+```
+
+
+```{r}
+#genefilter: methods for filtering genes from high-throughput experiments
+library(genefilter)
+help(package="genefilter")
+```
+
+### Part 2
+
+```{r}
+set.seed(1)
+library(downloader)
+url = "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/femaleControlsPopulation.csv"
+filename = "femaleControlsPopulation.csv"
+if (!file.exists(filename)) download(url,destfile=filename)
+population = read.csv(filename)
+head(population)
+pvals <- replicate(1000,{
+  control = sample(population[,1],12)
+  treatment = sample(population[,1],12)
+  t.test(treatment,control)$p.val
+})
+head(pvals)
+hist(pvals)
+sum(pvals < 0.05) / length(pvals)
+mean(pvals < 0.05)
+mean(pvals < 0.01)
+```
+
+```{r}
+set.seed(100)
+nps <- replicate(1000, {
+  pvals <- replicate(20, {
+    cases = rnorm(10,30,2)
+    controls = rnorm(10,30,2)
+    t.test(cases,controls)$p.val
+  })
+  sum(pvals < 0.05)
+  })
+mean(nps)
+```
+
+```{r}
+nps <- replicate(1000, {
+  pvals <- replicate(20, {
+    cases = rnorm(10,30,2)
+    controls = rnorm(10,30,2)
+    t.test(cases,controls)$p.val
+  })
+  any(pvals < 0.05)
+  })
+sum(nps)/1000
+```
+
+```{r}
+B<-1000
+minpval <- replicate(B, min(runif(8793,0,1))<0.05)
+mean(minpval>=1)
+```
+
+
+### 1.3.3: SIDAK'S PROCEDURE
+
+```{r}
+alphas <- seq(0,0.25,0.01)
+alphas <- 0.05
+m <- seq(1, 10000, 100)
+bon <- sapply(alphas, function(x) x/m)
+sidak <- sapply(alphas, function(x) 1-(1-x)^(1/m))
+mean(bon <= sidak)
+
+alphas <- seq(0,0.25,0.01)
+par(mfrow=c(2,2))
+for(m in c(2,10,100,1000)){
+  plot(alphas,alphas/m - (1-(1-alphas)^(1/m)),type="l") # difference
+  abline(h=0,col=2,lty=2)
+}
+
+```
+
+### QUESTION 1.4.2: MONTE CARLO SIMULATION
+```{r}
+set.seed(1)
+bon <- replicate(10000, {
+  pvals <- runif(8793, 0, 1)
+  sum(pvals < 0.05/8793) > 0
+})
+mean(bon)
+```
+
+```{r}
+set.seed(1)
+B <- 10000
+m <- 8793
+alpha <- 0.05
+pvals <- matrix(runif(B*m,0,1),B,m)
+k <- alpha/m
+mistakes <- rowSums(pvals<k) 
+mean(mistakes>0)
+```
+
+```{r}
+set.seed(1)
+B <- 10000
+m <- 8793
+alpha <- 0.05
+pvals <- matrix(runif(B*m,0,1),B,m)
+k <- 1-(1-alpha)^(1/m)
+mistakes <- rowSums(pvals<k) 
+mean(mistakes>0)
+```
+
+### QUESTION 1.5.1
+
+How many genes have p-values smaller than 0.05?
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+library(genefilter)
+?rowttests
+tt <- rowttests(geneExpression, factor(sampleInfo$group)) # factor
+head(tt)
+sum(tt$p.value < 0.05)
+```
+
+
+```{r}
+sum(tt$p.value < 0.05/nrow(geneExpression))
+```
+
+### QUESTION 1.5.3
+```{r}
+?p.adjust
+padj <- p.adjust(tt$p.value, method="fdr")
+head(padj)
+sum(padj < 0.05)
+```
+
+```{r}
+library(qvalue)
+?qvalue
+qval <- qvalue(tt$p.value)
+sum(qval$qvalues < 0.05)
+qval$pi0
+```
+
+```{r}
+plot(padj, qval$qvalues)
+```
+
+```{r}
+plot(qval$qvalues/padj)
+abline(h=qval$pi0, col=2) 
+```
+
+```{r}
+pvals <- tt$p.value
+hist(pvals, breaks=seq(0,1,len=21))
+expectedfreq <- length(pvals)/20 #per bin
+abline(h=expectedfreq,col=1,lty=1)
+abline(h=expectedfreq*qvalue(pvals)$pi0,col=2,lty=2)
+```
+
+### QUESTION 1.5.7
+```{r}
+n <- 24
+m <- 8793
+alpha <- 0.05
+positives <- 500
+m0 <- m - positives 
+m1 <- positives
+
+set.seed(1)
+ttmc <- replicate(1000, {
+  mat <- matrix(rnorm(n*m), m, n)
+  g <- as.factor(c(rep(1, n/2), rep(0, n/2)))
+  delta <- 2
+  mat[1:positives,1:(n/2)] <- mat[1:positives,1:(n/2)]+delta
+  tt <- rowttests(mat, g)
+  
+  bonf <- tt$p.value < alpha/nrow(mat)
+  padj <- p.adjust(tt$p.value, method="fdr") < alpha
+  qval <- qvalue(tt$p.value)$qvalues < alpha
+  
+  c(bonffp=sum(bonf[(positives+1):m] == 1) / m0,
+    bonffn=sum(bonf[1:positives] == 0) / m1,
+    padjfp=sum(padj[(positives+1):m] == 1) / m0,
+    padjfn=sum(padj[1:positives] == 0) / m1,
+    qvalfp=sum(qval[(positives+1):m] == 1) / m0,
+    qvalfn=sum(qval[1:positives] == 0) / m1
+    )
+  })
+
+dim(ttmc)
+rowMeans(ttmc)
+```
+
+### QUESTION 1.6.1
+```{r}
+#source("http://www.bioconductor.org/biocLite.R")
+#biocLite("SpikeInSubset")
+library(SpikeInSubset)
+data(mas133)
+```
+
+```{r}
+e <- exprs(mas133)
+plot(e[,1],e[,2],main=paste0("corr=",signif(cor(e[,1],e[,2]),3)),cex=0.5)
+k <- 3000
+b <- 1000 #a buffer
+polygon(c(-b,k,k,-b),c(-b,-b,k,k),col="red",density=0,border="red")
+
+sum(e[, 1] < k & e[, 2] < k) / nrow(e)
+
+```
+
+```{r}
+plot(log2(e[,1]),log2(e[,2]),main=paste0("corr=",signif(cor(log2(e[,1]),log2(e[,2])),2)),cex=0.5)
+k <- log2(3000)
+b <- log2(0.5)
+polygon(c(b,k,k,b),c(b,b,k,k),col="red",density=0,border="red")
+```
+
+```{r}
+e <- log2(exprs(mas133))
+plot((e[,1]+e[,2])/2,e[,2]-e[,1],cex=0.5)
+sd(e[,2]-e[,1])
+sum(abs(e[,2]-e[,1])> 1)
+```
+
+

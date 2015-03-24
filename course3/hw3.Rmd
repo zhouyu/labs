@@ -1,0 +1,60 @@
+---
+title: "hw3"
+author: "Yu Zhou"
+date: "March 22, 2015"
+output: html_document
+---
+
+### QUESTION 2.4.1
+```{r}
+library(rafalib)
+mypar2(1, 1)
+set.seed(1)
+m = 10000
+n = 24
+x = matrix(rnorm(m*n),m,n)
+colnames(x)=1:n
+
+d <- dist(t(x))
+dm <- as.matrix(d)
+which.max(c(dm[7, 23], dm[19, 14], dm[1, 16], dm[17, 18]))
+dm[1:5, 1:5]
+
+hc <- hclust(d)
+plot(hc)
+
+length(table(cutree(hc, h=143)))
+
+myplclust(hc, labels=colnames(x))
+myplclust
+```
+
+
+```{r}
+set.seed(1)
+ng <- replicate(100, {
+  m = 10000
+  n = 24
+  x = matrix(rnorm(m*n),m,n)
+  hc <- hclust(dist(t(x)))
+  length(table(cutree(hc, h=143)))
+})
+ng
+sd(ng)
+```
+
+```{r}
+set.seed(1)
+m = 10000
+n = 24
+nc = replicate(100,{
+  x = matrix(rnorm(m*n),m,n)
+  hc = hclust( dist( t(x)))
+  length(unique(cutree(hc,h=143)))
+})
+plot(table(nc)) ## look at the distribution
+popsd(nc)
+popsd
+```
+
+

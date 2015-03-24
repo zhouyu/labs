@@ -1,0 +1,229 @@
+---
+title: "hw2"
+author: "Yu Zhou"
+date: "March 15, 2015"
+output: html_document
+---
+
+### QUESTION 2.1.1
+
+```{r}
+#library(devtools)
+#install_github("genomicsclass/tissuesGeneExpression")
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+head(e)
+head(tissue)
+table(tissue)
+```
+
+```{r}
+dist(t(e[, c(3, 45)]))
+```
+
+```{r}
+probes <- row.names(e)
+idxi <- which(probes=="210486_at")
+idxj <- which(probes=="200805_at")
+dist(e[c(idxi, idxj), ])
+nrow(e) * nrow(e)
+```
+```{r}
+d = dist(t(e))
+?dist
+length(d)
+```
+
+
+```{r}
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+s = svd(e)
+signflips = sample(c(-1,1),ncol(e),replace=TRUE)
+signflips
+
+newu= sweep(s$u,2,signflips,FUN="*")
+newv= sweep(s$v,2,signflips,FUN="*" )
+identical( s$u %*% diag(s$d) %*% t(s$v), newu %*% diag(s$d) %*% t(newv))
+```
+
+```{r}
+m = rowMeans(e)
+cor(s$u[, 1], m)
+```
+
+```{r}
+newmeans = rnorm(nrow(e)) ##random values we will add to create new means
+newe = e+newmeans ##we change the means
+sqrt(crossprod(e[,3]-e[,45]))
+sqrt(crossprod(newe[,3]-newe[,45])) 
+
+y = e - rowMeans(e)
+s = svd(y)
+resid = y - s$u %*% diag(s$d) %*% t(s$v)
+max(abs(resid))
+
+x=matrix(rep(c(1,2),each=5),5,2)
+x
+x*c(1:5)
+sweep(x, 1, 1:5,"*")
+dim(s$u)
+#dim(s$d)
+dim(s$u %*% s$d)
+
+```
+
+```{r}
+z = s$d * t(s$v)
+sqrt(crossprod(e[,3]-e[,45]))
+sqrt(crossprod(y[,3]-y[,45]))
+sqrt(crossprod(z[,3]-z[,45]))
+dim(z)
+```
+
+```{r}
+k <- 2
+abs(sqrt(crossprod(e[,3]-e[,45]))- sqrt(crossprod(z[1:k,3]-z[1:k,45])))
+```
+
+```{r}
+dd <- sqrt(crossprod(e[,3]-e[,45]))
+dddiff <- sapply(1:10, function(k) {
+  abs(dd-sqrt(crossprod(z[1:k,3]-z[1:k,45]))) / dd
+})
+dddiff
+```
+
+```{r}
+distances = sqrt(apply(e[,-3]-e[,3],2,crossprod))
+aproxdists <- sqrt(apply(z[1:2,-3]-z[1:2,3],2,crossprod))
+plot(distances, aproxdists)
+cor(distances, aproxdists, method="spearman")
+```
+
+
+### MDS
+
+```{r}
+library(tissuesGeneExpression)
+data(tissuesGeneExpression)
+##show matrix
+colind <- tissue%in%c("kidney","colon","liver")
+mat <- e[,colind]
+ftissue <- factor(tissue[colind])
+dim(mat)
+
+s <- svd(mat-rowMeans(mat))
+dim(s$v)
+
+z <- sweep(s$v[,1:2], 2, s$d[1:2],"*")
+dim(z)
+
+library(rafalib)
+mypar2(1,1)
+plot(z[,1], z[,2], bg=as.numeric(ftissue), pch=21, xlab="First dimension", ylab="Second dimension")
+legend("bottomright", levels(ftissue), col=seq(along=levels(ftissue)), pch=15)
+
+z <- sweep(s$v[,3:4], 2, s$d[3:4], "*")
+mypar2(1,1)
+plot(z[,1],z[,2],bg=as.numeric(ftissue),pch=21,xlab="First dimension",ylab="Second dimension")
+```
+
+```{r}
+d <- dist(t(mat))
+m <- as.matrix(d)
+dim(m)
+m[1:5, 1:5]
+
+mds <- cmdscale(d)
+library(rafalib)
+mypar2(1,1)
+plot(mds[,1],mds[,2],bg=as.numeric(ftissue),pch=21,xlab="First dimension",ylab="Second dimension",cex=1)
+legend("bottomleft",levels(ftissue),col=seq(along=levels(ftissue)),pch=15,cex=1.5)
+
+```
+
+
+
+### QUESTION 2.3.1
+```{r}
+y = e - rowMeans(e)
+s = svd(y)
+z = s$d * t(s$v)
+length(s$d)
+
+library(rafalib)
+ftissue = factor(tissue)
+mypar2(1,1)
+plot(z[1,],z[2,],col=as.numeric(ftissue))
+legend("topleft",levels(ftissue),col=seq_along(ftissue),pch=1)
+
+d = dist(t(e))
+mds = cmdscale(d)
+dim(mds)
+dim(z)
+cor(z[1, ], mds[, 1])
+cor(z[2, ], mds[, 2])
+plot(z[1, ], mds[, 1])
+```
+
+### QUESTION 2.3.2
+```{r}
+library(rafalib)
+ftissue = factor(tissue)
+mypar2(1,3)
+plot(z[1,],z[2,],col=as.numeric(ftissue))
+#legend("topleft",levels(ftissue),col=seq_along(ftissue),pch=1)
+plot(mds[,1],mds[,2],col=as.numeric(ftissue))
+plot(-z[1,], -z[2,],col=as.numeric(ftissue))
+```
+
+
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+s = svd(geneExpression-rowMeans(geneExpression))
+z = s$d * t(s$v)
+dim(z)
+sampleInfo$group
+zcor <- apply(z, 1, function(x) cor(x, sampleInfo$group))
+max(zcor)
+which(zcor == max(zcor))
+max(zcor[-1])
+which(zcor == max(zcor[-1]))
+```
+
+```{r}
+sampleInfo$date
+month = format( sampleInfo$date, "%m")
+month = factor( month)
+mcor <- cor(as.numeric(month), t(z))
+mcor
+which.max(mcor)
+table(sampleInfo$g, month)
+```
+
+```{r}
+s$u[, 6]
+sum(geneAnnotation$CHR == "chrUn", na.rm = T)
+sum(is.na(geneAnnotation$CHR))
+table(geneAnnotation$CHR)
+df <- data.frame(chr=geneAnnotation$CHR, u6=s$u[, 6], stringsAsFactors=FALSE)
+nrow(df)
+df <- df[!is.na(df$chr) & df$chr != "chrUn", ]
+nrow(df)
+library(ggplot2)
+p <- ggplot(df, aes(y=u6, x=chr)) + geom_boxplot()
+p
+
+result = split(s$u[,6],geneAnnotation$CHR)
+str(result)
+result = result[ which(names(result)!="chrUn") ]
+boxplot(result,range=0)
+boxplot(result,range=0,ylim=c(-0.025,0.025))
+medians = sapply(result,median)
+names(result)[ which.max(abs(medians)) ]
+```
+
+
+
