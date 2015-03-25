@@ -58,3 +58,151 @@ popsd
 ```
 
 
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+
+set.seed(10)
+km <- kmeans(t(geneExpression), 5)
+km$cluster
+
+head(sampleInfo)
+
+cls <- km$cluster+rnorm(nrow(sampleInfo), sd=0.1)
+plot(as.numeric(sampleInfo$group), cls)
+plot(sampleInfo$date, cls)
+plot(as.numeric(sampleInfo$ethnicity), cls)
+plot(format(sampleInfo$date, "%y"), cls)
+```
+
+```{r}
+mds=cmdscale(dist(t(geneExpression)))
+set.seed(10)
+result=kmeans(t(geneExpression),5)
+mypar(1,1)
+plot(mds,bg=result$cl,pch=21)
+table(sampleInfo$group,result$cluster)
+table(sampleInfo$date,result$cluster)
+##looks better if we re-order:
+table(sampleInfo$date,result$cluster)[,c(4,1,5,3,2)]
+```
+
+
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+library(matrixStats)
+library(dplyr)
+library(RColorBrewer)
+library(gplots)
+dfm <- data.frame(idx=1:nrow(geneExpression), mads=rowMads(geneExpression))
+dfm <- arrange(dfm, -mads)
+idx <- dfm$idx[1:25]
+e <- geneExpression[idx, ]
+#e <- t(scale(t(geneExpression[idx, ])))
+dim(e)
+nrow(sampleInfo)
+head(sampleInfo)
+gcol=brewer.pal(3,"Dark2")
+gcol=gcol[sampleInfo$group+1]
+gcol
+pdf("25.pdf", width=10, height=10)
+heatmap.2(e, trace="none", key=TRUE, scale="row",
+          labRow=geneAnnotation[idx, "CHR"],
+          labCol=sampleInfo$date,
+          ColSideColors=gcol)
+dev.off()
+```
+
+
+```{r}
+##load libraries
+library(rafalib)
+library(gplots)
+library(matrixStats)
+library(RColorBrewer)
+##make colors
+cols = colorRampPalette(rev(brewer.pal(11,"RdBu")))(25)
+gcol=brewer.pal(3,"Dark2")
+gcol=gcol[sampleInfo$g+1]
+
+##make lables: remove 2005 since it's common to all
+labcol= gsub("2005-","",sampleInfo$date)  
+
+##pick highly variable genes:
+sds =rowMads(geneExpression)
+ind = order(sds,decreasing=TRUE)[1:25]
+
+## make heatmap
+heatmap.2(geneExpression[ind,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labRow=geneAnnotation$CHR[ind],
+          labCol=labcol,
+          ColSideColors=gcol,
+          key=FALSE)
+    
+```
+
+```{r}
+set.seed(17)
+m = nrow(geneExpression)
+n = ncol(geneExpression)
+x = matrix(rnorm(m*n),m,n)
+g = factor(sampleInfo$g )
+```
+
+###1. Taking the 50 genes with smallest p-values obtained with rowttests
+```{r}
+library(genefilter)
+ttest <- rowttests(x, g)
+idx <- order(ttest$p.value)[1:50]
+labcol= gsub("2005-","",sampleInfo$date)  
+gcol=brewer.pal(3,"Dark2")
+gcol=gcol[sampleInfo$g+1]
+heatmap.2(x[idx,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labCol=labcol,
+          ColSideColors=gcol,
+          key=FALSE)
+    
+```
+
+
+###2. Taking the 50 genes with largest standard deviations.
+```{r}
+sds =rowMads(x)
+ind = order(sds,decreasing=TRUE)[1:50]
+heatmap.2(x[ind,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labCol=labcol,
+          ColSideColors=gcol,
+          key=FALSE)
+```
+
+### ans
+```{r}
+library(gplots)
+library(matrixStats)
+library(genefilter)
+library(RColorBrewer)
+cols = colorRampPalette(rev(brewer.pal(11,"RdBu")))(25)
+
+ttest = rowttests(x,g)
+sds = rowSds(x)
+Indexes = list(t=order(ttest$p.value)[1:50], s=order(-sds)[1:50])
+for(ind in Indexes){
+ heatmap.2(x[ind,],
+          col=cols,
+          trace="none",
+          scale="row",
+          labCol=g,
+          key=FALSE)
+ }
+```
+

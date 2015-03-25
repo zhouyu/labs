@@ -16,3 +16,4 @@ footnotes.md
 */*.tbi
 */.DS_Store
 */.Rhistory
+.Rproj.user
