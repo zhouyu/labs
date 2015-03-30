@@ -1,0 +1,171 @@
+---
+title: "hw7"
+author: "Yu Zhou"
+date: "March 29, 2015"
+output: html_document
+---
+
+```{r}
+setwd("~/src/edxRlabs/course3")
+library(rafalib)
+```
+
+
+```{r}
+#Prob(+|D)=0.99,Prob(−|no D)=0.99
+#P(D) <- 1/4000
+#Prob(D|+)
+1/4000 * 0.99 / (1/4000 * 0.99 + (1-1/4000)*(1-0.99))
+```
+
+```{r}
+f_players <- file.path("~/src/edxRlabs/course3", "players.rds")
+if (!file.exists(f_players)) {
+  tmpfile <- tempfile()
+  tmpdir <- tempdir()
+  download.file("http://seanlahman.com/files/database/lahman-csv_2014-02-14.zip",tmpfile)
+  ##this shows us files
+  filenames <- unzip(tmpfile,list=TRUE)
+  players <- read.csv(unzip(tmpfile,files="Batting.csv",exdir=tmpdir),as.is=TRUE)
+  unlink(tmpdir)
+  file.remove(tmpfile)
+  dim(players)
+  saveRDS(players, f_players)
+  } else {
+  players <- readRDS(f_players)
+  }
+dim(players)
+```
+
+```{r}
+head(players)
+library(dplyr)
+#filter(players,yearID==2012) %>% mutate(AVG=H/AB) %>% filter(AB>=500) %>% select(AVG)
+```
+
+```{r}
+mypar2(1, 1)
+dat <- filter(players,yearID %in% c(2010, 2011, 2012)) %>% 
+  mutate(AVG=H/AB) %>% 
+  filter(AB>=500) %>% 
+  select(AVG)
+mean(dat$AVG)
+sd(dat$AVG)
+hist(dat$AVG)
+qqnorm(dat$AVG)
+qqline(dat$AVG)
+```
+
+The sum (numerator of AVG) is binomial so it has SD: sqrt(Np(1−p). The SD of a random variable times a constant is the SD of the random variable times that constant so for the AVG we divide by N get sqrt(p(1−p)/N). 
+```{r}
+sqrt(20 * 0.45 * (1-0.45))/20
+
+sqrt(.45*(1-.45)/20)
+```
+
+```{r}
+B <- 0.11^2 / (0.11^2 +  0.027^2)
+B
+B*0.275 + (1-B)*0.45
+```
+
+```{r}
+library(Biobase)
+library(SpikeInSubset)
+data(rma95)
+y <- exprs(rma95)
+dim(y)
+colnames(y)
+```
+
+```{r}
+pData(rma95)
+g <- factor(rep(0:1,each=3))
+spike <- rownames(y) %in% colnames(pData(rma95))
+sum(spike)
+```
+
+```{r}
+library(genefilter)
+head(y)
+tt <- rowttests(y, g)
+tp <- sum(tt$p.value < 0.01 & spike)
+np <- sum(tt$p.value < 0.01)
+(np - tp) / np
+
+# Solution
+rtt = rowttests(y, g)
+index = rtt$p.value < 0.01 
+print (mean( !spike[index] ))
+## We can make a volcano plot to visualize this:
+mask <- with(rtt, abs(dm) < .2 & p.value < .01)
+cols <- ifelse(mask,"red",ifelse(spike,"dodgerblue","black"))
+with(rtt,plot(-dm, -log10(p.value), cex=.8, pch=16,
+     xlim=c(-1,1), ylim=c(0,5),
+     xlab="difference in means",
+     col=cols))
+abline(h=2,v=c(-.2,.2), lty=2)
+```
+
+
+```{r}
+ssd <- sqrt(rowVars(y[, which(g==1)]))
+tpidx <- spike & index
+sum(tpidx)
+fpidx <- (!spike) & index
+sum(fpidx)
+fnidx <- spike & (!index)
+sum(fnidx)
+tnidx <- (!spike) & (!index)
+sum(tnidx)
+mypar2(1, 4)
+LIM <- range(ssd)
+boxplot(ssd[tpidx], ylim=LIM, xlab="TP")
+boxplot(ssd[fpidx], ylim=LIM, xlab="FP")
+boxplot(ssd[tnidx], ylim=LIM, xlab="TN")
+boxplot(ssd[fnidx], ylim=LIM, xlab="FN")
+```
+
+```{r}
+sds <- rowSds(y[, g==0])
+index <- paste0( as.numeric(spike), as.numeric(rtt$p.value<0.01))  # Good tip
+index <- factor(index,levels=c("11","01","00","10"),labels=c("TP","FP","TN","FN"))
+mypar2(1, 1)
+boxplot(split(sds,index))
+```
+
+```{r}
+library(limma)
+fit <- lmFit(y, design=model.matrix(~ g))
+colnames(coef(fit))
+fit <- eBayes(fit)
+
+sampleSD <- fit$sigma
+posteriorSD <- sqrt(fit$s2.post)
+LIM <- range(c(sampleSD, posteriorSD))
+plot(sampleSD, posteriorSD, xlim=LIM, ylim=LIM)
+abline(0, 1)
+abline(h=sqrt(fit$s2.prior))
+```
+
+
+```{r}
+library(limma)
+fit <- lmFit(y, design=model.matrix(~ g))
+fit <- eBayes(fit)
+##second coefficient relates to diffences between group
+pvals <- fit$p.value[,2] 
+index <- pvals < 0.01 
+print (mean( !spike[index] ))
+
+
+## We can make a volcano plot to visualize this:
+mask <- abs(fit$coef[,2]) < .2 & fit$p.value[,2] < .01
+cols <- ifelse(mask,"red",ifelse(spike,"dodgerblue","black"))
+plot(fit$coef[,2], -log10(fit$p.value[,2]), cex=.8, pch=16,
+     xlim=c(-1,1), ylim=c(0,5),
+     xlab="difference in means",
+     col=cols)
+abline(h=2,v=c(-.2,.2), lty=2)
+```
+

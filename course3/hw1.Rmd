@@ -6,9 +6,8 @@ output: html_document
 ---
 
 ```{r}
-setwd("course3")
+setwd("~/src/edxRlabs/course3")
 ```
-
 
 ### Part 1
 ```{r}
@@ -33,7 +32,7 @@ sum(geneAnnotation$CHR=="chrY", na.rm=TRUE)
 
 ```{r}
 head(geneAnnotation)
-head(geneExpression)
+head(geneExpression[, 1:5])
 samples <- sampleInfo[sampleInfo$date == as.Date("2005-06-10"), "filename"]
 probes <- geneAnnotation[which(geneAnnotation$SYMBOL == "ARPC1A"), "PROBEID"]
 geneExpression[probes, samples]

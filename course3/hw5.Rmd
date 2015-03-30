@@ -5,6 +5,9 @@ date: "March 22, 2015"
 output: html_document
 ---
 
+```{r}
+setwd("~/src/edxRlabs/course3")
+```
 
 ### QUESTION 3.1.1  
 
@@ -154,7 +157,6 @@ set.seed(3)
 index2 = sample( which(sampleInfo$ethnicity == "CEU" & year=="02"), 3)
 index = c( index1, index2)
 g = droplevels(sampleInfo$ethnicity[index])
-g
 pval = rowttests(geneExpression[ ,index], g)$p.value
 qval = qvalue(pval)
 sum(qval$qvalue < 0.05)
@@ -178,8 +180,6 @@ sum(qval$qvalue < 0.1)
 ```
 
 ```{r}
-head(geneExpression)
-nrow(geneAnnotation)
 all(geneAnnotation$PROBEID == rownames(geneExpression))
 chroms <- geneAnnotation[qval$qvalue < 0.1, "CHR"]
 mean(chroms %in% c("chrX", "chrY"))
@@ -234,9 +234,7 @@ m <- cor(y)
 dim(m)
 image(t(m))
 
-sampleInfo
 sampleInfo2 <- dplyr::arrange(sampleInfo, date)
-head(sampleInfo2)
 m2 <- cor(y[, sampleInfo2$filename])
 image(t(m2))
 mypar2(1, 1)
@@ -266,7 +264,7 @@ pcs <- svd(y)$v
 dim(pcs)
 ```
 
-```{r}
+```{r, fig.width=18, fig.height=12}
 month <- factor( format(sampleInfo$date,"%m"))
 label = gsub("2005-", "", sampleInfo$date)
 mypar2(1, 1)
@@ -304,7 +302,6 @@ sum(vep >= 0.10)
 
 
 ```{r}
-dim(s$v)
 cormonth <- apply(s$v, 2, function(x) abs(cor(x, as.numeric(month))))
 max(cormonth)
 which.max(cormonth)
@@ -338,7 +335,6 @@ library(sva)
 library(Biobase)
 library(GSE5859Subset)
 data(GSE5859Subset)
-
 ```
 
 ```{r}

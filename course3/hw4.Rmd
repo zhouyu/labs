@@ -1,0 +1,225 @@
+---
+title: "hw4"
+author: "Yu Zhou"
+date: "March 29, 2015"
+output: html_document
+---
+```{r}
+setwd("~/src/edxRlabs/course3")
+```
+
+```{r}
+n = 1000
+y = rbinom(n,1,0.25)
+##proportion of ones Pr(Y)
+sum(y==1)/length(y)
+##expectaion of Y
+mean(y)
+```
+
+```{r}
+n = 10000
+set.seed(1)
+men = rnorm(n,176,7) #height in centimeters
+women = rnorm(n,162,7) #height in centimeters
+y = c(rep(0,n),rep(1,n))
+x = round(c(men,women))
+##mix it up
+ind = sample(seq(along=y))
+y = y[ind]
+x = x[ind]
+
+mean(y[x == 176])
+```
+
+```{r}
+xx = seq(160,178)
+yy = sapply(xx, function(xv) mean(y[x == xv]))
+plot(xx, yy)
+abline(h=0.5)
+max(xx[yy>0.5])
+```
+
+### QUESTION 2.7.1
+```{r}
+set.seed(5)
+N = 250
+ind = sample(length(y),N)
+Y = y[ind]
+X = x[ind]
+
+rle <- loess(Y ~ X)
+predict(rle, 168)
+```
+
+```{r}
+fit=loess(Y~X)
+predict(fit,newdata=data.frame(X=168))
+
+##Here is a plot
+xs = seq(160,178)
+Pr =sapply(xs,function(x0) mean(Y[X==x0]))
+plot(xs,Pr)
+fitted=predict(fit,newdata=data.frame(X=xs))
+lines(xs,fitted)
+```
+
+```{r}
+set.seed(5)
+N = 250
+
+pl <- replicate(1000, {
+  ind = sample(length(y),N)
+  Y = y[ind]
+  X = x[ind]
+  fit = loess(Y ~ X)
+  predict(fit, data.frame(X=168))
+})
+mean(pl)
+sd(pl)
+library(rafalib)
+popsd(pl)
+```
+
+### QUESTION 2.8.1
+
+```{r}
+library(GSE5859Subset)
+data(GSE5859Subset)
+y = factor(sampleInfo$group)
+X = t(geneExpression)
+out = which(geneAnnotation$CHR%in%c("chrX","chrY"))
+X = X[,-out]
+dim(X)
+length(y)
+table(y)
+```
+
+```{r}
+library(caret)
+set.seed(1)
+idx <- createFolds(y, k=10)
+sapply(idx, function(i) table(y[i]))
+idx
+idx[[3]][2]
+```
+
+```{r}
+library(class)
+library(genefilter)
+i=2
+pvalues <- rowttests(t(X[-idx[[i]], ]), y[-idx[[i]]])$p.value
+m <- 8
+ind2 <- order(pvalues)[1:m]
+pred <- knn(train=X[ -idx[[i]], ind2], test=X[ idx[[i]], ind2], cl=y[ -idx[[i]] ], k=5)
+table(true=y[ idx[[i]] ], pred)
+sum(pred != y[ idx[[i]] ])
+```
+
+```{r}
+ks <- c(5)
+m <- 8
+res <- sapply(ks, function(k) {
+  res.k <- sapply(seq_along(idx), function(i) {
+    # select genes
+    pvalues <- rowttests(t(X[-idx[[i]], ]), y[-idx[[i]]])$p.value
+    ind2 <- order(pvalues)[1:m]
+    # predict the held-out samples using k nearest neighbors
+    pred <- knn(train=X[-idx[[i]], ind2], test=X[idx[[i]], ind2], cl=y[-idx[[i]]], k=k)
+    sum(y[idx[[i]]] != pred)
+  })
+  sum(res.k) / sum(sapply(idx, length))
+})
+res
+```
+
+### QUESTION 2.8.4  
+```{r}
+ms <- 2^c(1:11)
+ks <- seq(1, 9, 2)
+params <- expand.grid(k=ks, m=ms)
+res <- apply(params, 1, function(p) {
+  k <- p[1]
+  m <- p[2]
+  res.k <- sapply(seq_along(idx), function(i) {
+    # select genes
+    pvalues <- rowttests(t(X[-idx[[i]], ]), y[-idx[[i]]])$p.value
+    ind2 <- order(pvalues)[1:m]
+    # predict the held-out samples using k nearest neighbors
+    pred <- knn(train=X[-idx[[i]], ind2], test=X[idx[[i]], ind2], cl=y[-idx[[i]]], k=k)
+    sum(y[idx[[i]]] != pred)
+    })
+  sum(res.k) / sum(sapply(idx, length))
+})
+params[which.min(res), ]
+
+errors = matrix(res, 5, 11)
+library(rafalib)
+mypar2(1,1)
+matplot(ms, t(errors), type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+
+```
+
+
+### QUESTION 2.8.5
+```{r}
+ms <- 2^c(1:11)
+ks <- seq(1, 9, 2)
+params <- expand.grid(k=ks, m=ms)
+pvalues <- rowttests(t(X), y)$p.value
+res <- apply(params, 1, function(p) {
+  k <- p[1]
+  m <- p[2]
+  # select genes
+  ind2 <- order(pvalues)[1:m]
+  res.k <- sapply(seq_along(idx), function(i) {
+    # predict the held-out samples using k nearest neighbors
+    pred <- knn(train=X[-idx[[i]], ind2], test=X[idx[[i]], ind2], cl=y[-idx[[i]]], k=k)
+    sum(y[idx[[i]]] != pred)
+    })
+  sum(res.k) / sum(sapply(idx, length))
+})
+params[which.min(res), ]
+min(res)
+res[res==min(res)]
+
+errors = matrix(res, 5, 11)
+library(rafalib)
+mypar2(1,1)
+matplot(ms, t(errors), type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+
+```
+
+```{r}
+y = factor(as.numeric(format( sampleInfo$date, "%m")=="06"))
+y
+ms <- 2^c(1:11)
+ks <- seq(1, 9, 2)
+params <- expand.grid(k=ks, m=ms)
+res <- apply(params, 1, function(p) {
+  k <- p[1]
+  m <- p[2]
+  res.k <- sapply(seq_along(idx), function(i) {
+    # select genes
+    pvalues <- rowttests(t(X[-idx[[i]], ]), y[-idx[[i]]])$p.value
+    ind2 <- order(pvalues)[1:m]
+    # predict the held-out samples using k nearest neighbors
+    pred <- knn(train=X[-idx[[i]], ind2], test=X[idx[[i]], ind2], cl=y[-idx[[i]]], k=k)
+    sum(y[idx[[i]]] != pred)
+    })
+  sum(res.k) / sum(sapply(idx, length))
+})
+params[which.min(res), ]
+
+errors = matrix(res, 5, 11)
+library(rafalib)
+mypar2(1,1)
+matplot(ms, t(errors), type="l",log="x")
+legend("topright",as.character(ks),lty=seq_along(ks),col=seq_along(ks))
+
+
+```
+
+
